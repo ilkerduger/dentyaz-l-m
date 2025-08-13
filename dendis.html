@@ -1,0 +1,447 @@
+﻿<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dişçi CRM — Tam Özellikli (Local)</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.css" rel="stylesheet" />
+  <!-- SheetJS (xlsx) for Excel import/export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- jsPDF for PDF export -->
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <style>
+    body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; }
+    .card { border-radius: 12px; }
+    .fc { max-width: 100%; margin: 0 auto; }
+    @media print { .no-print { display: none !important; } }
+  </style>
+</head>
+<body>
+<div class="container my-4">
+  <h1 class="text-center mb-3">🦷 Dişçi CRM — Tam Özellikli</h1>
+
+  <!-- Auth / PIN -->
+  <div id="authBanner" class="alert alert-warning d-flex align-items-center no-print" role="alert">
+    <div class="flex-grow-1">Uygulama PIN ile korunuyor. İlk kullanımda PIN belirleyin veya giriş yapın.</div>
+    <div><button id="openAuthBtn" class="btn btn-sm btn-outline-dark">Giriş / PIN Ayarla</button></div>
+  </div>
+
+  <div class="d-flex gap-2 mb-3 no-print">
+    <button class="btn btn-primary" data-bs-toggle="tab" data-bs-target="#hasta-ekle" id="quick-add-patient">Yeni Hasta</button>
+    <button class="btn btn-success" data-bs-toggle="tab" data-bs-target="#randevu-ekle" id="quick-add-appointment">Yeni Randevu</button>
+    <button class="btn btn-secondary" id="showCalendarBtn">Takvim</button>
+    <input id="globalSearch" placeholder="Ara: hasta, doktor, işlem..." class="form-control ms-auto" style="max-width:360px;">
+  </div>
+
+  <ul class="nav nav-tabs no-print" id="mainTab" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#hastalar">Hastalar</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#hasta-ekle">Hasta Ekle / Düzenle</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#randevular">Randevular</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#randevu-ekle">Randevu Ekle / Düzenle</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#calendarTab">Takvim</button></li>
+  </ul>
+
+  <div class="tab-content mt-3">
+    <!-- Hastalar -->
+    <div class="tab-pane fade show active" id="hastalar">
+      <div class="card p-3">
+        <div class="d-flex align-items-center mb-2">
+          <h5 class="mb-0">Hastalar</h5>
+          <span class="ms-3 small text-muted">Toplam: <span id="patientCount">0</span></span>
+          <div class="ms-auto">
+            <input id="importPatientsFile" type="file" accept=".csv,.xlsx" class="form-control form-control-sm d-inline-block" style="width:220px"> 
+            <button class="btn btn-outline-secondary btn-sm" id="exportPatients">Dışa Aktar</button>
+            <button class="btn btn-outline-danger btn-sm" id="clearAllData">Tüm Verileri Sil</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle" id="patientsTable">
+            <thead class="table-light"><tr><th>#</th><th>Ad</th><th>Soyad</th><th>T.C. No</th><th>Telefon</th><th>E-posta</th><th>İşlemler</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hasta Ekle -->
+    <div class="tab-pane fade" id="hasta-ekle">
+      <div class="card p-3">
+        <h5>Hasta Formu</h5>
+        <form id="patientForm" class="row g-3 mt-1">
+          <input type="hidden" name="id" id="patient_id">
+          <div class="col-md-4"><label class="form-label">Ad</label><input name="ad" id="ad" class="form-control" required></div>
+          <div class="col-md-4"><label class="form-label">Soyad</label><input name="soyad" id="soyad" class="form-control" required></div>
+          <div class="col-md-4"><label class="form-label">Doğum</label><input name="dogum" id="dogum" type="date" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">T.C. No</label><input name="tc_no" id="tc_no" class="form-control" maxlength="11"></div>
+          <div class="col-md-4"><label class="form-label">Telefon</label><input name="telefon" id="telefon" class="form-control"></div>
+          <div class="col-md-4"><label class="form-label">E-posta</label><input name="eposta" id="eposta" type="email" class="form-control"></div>
+          <div class="col-12"><label class="form-label">Adres</label><textarea name="adres" id="adres" class="form-control" rows="2"></textarea></div>
+
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" id="resetPatientBtn">Temizle</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Randevular -->
+    <div class="tab-pane fade" id="randevular">
+      <div class="card p-3">
+        <div class="d-flex gap-2 mb-2">
+          <h5 class="mb-0">Randevular</h5>
+          <span class="ms-3 small text-muted">Toplam: <span id="appointmentCount">0</span></span>
+          <div class="ms-auto d-flex gap-2">
+            <input id="filterDoctor" placeholder="Doktor filtre" class="form-control form-control-sm" style="width:180px">
+            <input id="filterFrom" type="date" class="form-control form-control-sm" style="width:150px">
+            <input id="filterTo" type="date" class="form-control form-control-sm" style="width:150px">
+            <button class="btn btn-sm btn-outline-secondary" id="applyFilters">Uygula</button>
+            <button class="btn btn-sm btn-outline-secondary" id="exportAppointments">Dışa Aktar</button>
+            <button class="btn btn-sm btn-outline-secondary" id="exportAppointmentsPDF">PDF Olarak İndir</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle" id="appointmentsTable">
+            <thead class="table-light"><tr><th>#</th><th>Hasta</th><th>Doktor</th><th>İşlem</th><th>Tarih</th><th>Saat</th><th>Not</th><th>İşlemler</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Randevu Ekle -->
+    <div class="tab-pane fade" id="randevu-ekle">
+      <div class="card p-3">
+        <h5>Randevu Formu</h5>
+        <form id="appointmentForm" class="row g-3 mt-1">
+          <input type="hidden" name="id" id="appointment_id">
+          <div class="col-md-4"><label class="form-label">Hasta</label><select name="hasta_id" id="hasta_id" class="form-select" required></select></div>
+          <div class="col-md-4"><label class="form-label">Doktor</label><input name="doktor" id="doktor" class="form-control" required></div>
+          <div class="col-md-4"><label class="form-label">İşlem</label><input name="islem" id="islem" class="form-control"></div>
+          <div class="col-md-3"><label class="form-label">Tarih</label><input name="tarih" id="tarih" type="date" class="form-control" required></div>
+          <div class="col-md-3"><label class="form-label">Saat</label><input name="saat" id="saat" type="time" class="form-control" required></div>
+          <div class="col-12"><label class="form-label">Notlar</label><textarea name="notlar" id="notlar" class="form-control" rows="2"></textarea></div>
+
+          <div class="col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-success">Kaydet</button>
+            <button type="button" class="btn btn-outline-secondary" id="resetAppointmentBtn">Temizle</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Takvim -->
+    <div class="tab-pane fade" id="calendarTab">
+      <div class="card p-3">
+        <div id="calendar" style="min-height:500px;"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="mt-3 small text-muted">Not: Tüm veriler LocalStorage'da saklanır. PIN ve hatırlatıcılar tarayıcı düzeyinde çalışır.</div>
+</div>
+
+<!-- Modal: Auth -->
+<div class="modal fade" id="authModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Giriş / PIN Ayarla</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <div id="authMsg" class="alert alert-info">Mevcut PIN yoksa yeni bir PIN oluşturun (4-8 haneli). Bu PIN sadece tarayıcıda saklanır.</div>
+        <div class="mb-2"><label class="form-label">PIN</label><input id="authPin" type="password" class="form-control"></div>
+        <div class="mb-2"><label class="form-label">Yeni PIN (isteğe bağlı)</label><input id="authNewPin" type="password" class="form-control"></div>
+        <div class="form-text">NOT: Bu sadece basit koruma içindir; gerçek uygulama için sunucu tarafı auth gerekir.</div>
+      </div>
+      <div class="modal-footer">
+        <button id="authSaveBtn" class="btn btn-primary">Giriş / Kaydet</button>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Bootstrap JS & FullCalendar -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/main.min.js"></script>
+
+<script>
+/* ===================== Tam Özellikli Dişçi CRM (Tek Dosya) =====================
+   - LocalStorage: patients, appointments, settings
+   - Takvim: FullCalendar (randevuları gösterir)
+   - Hatırlatıcılar: Notification API + setTimeout (tarayıcı açıkken çalışır)
+   - Excel/CSV import-export: SheetJS
+   - PDF export: jsPDF
+   - Basit PIN auth (local, client-side)
+   - Gelişmiş filtreleme
+   ============================================================================ */
+
+// --- Storage wrapper ---
+const Keys = { patients: 'dg_full_patients_v1', appts: 'dg_full_appts_v1', settings: 'dg_full_settings_v1' };
+const Storage = {
+  load(k){ try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){ return []; } },
+  save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
+};
+
+let patients = Storage.load(Keys.patients) || [];
+let appointments = Storage.load(Keys.appts) || [];
+let settings = JSON.parse(localStorage.getItem(Keys.settings) || '{}') || {};
+
+// --- Utilities ---
+function uid(pre='id'){ return pre + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function fullName(p){ return ((p.ad||'') + ' ' + (p.soyad||'')).trim(); }
+function escapeHtml(s){ if (s===undefined||s===null) return ''; return String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;'); }
+
+// --- Elements ---
+const patientsTableBody = document.querySelector('#patientsTable tbody');
+const appointmentsTableBody = document.querySelector('#appointmentsTable tbody');
+const patientCountEl = document.getElementById('patientCount');
+const appointmentCountEl = document.getElementById('appointmentCount');
+const hastaSelect = document.getElementById('hasta_id');
+const globalSearch = document.getElementById('globalSearch');
+const filterDoctor = document.getElementById('filterDoctor');
+const filterFrom = document.getElementById('filterFrom');
+const filterTo = document.getElementById('filterTo');
+
+// --- Render functions ---
+function renderPatientsTable(q=''){
+  const rows = patients.filter(p=>{
+    if(!q) return true; const qq=q.toLowerCase();
+    return (p.ad||'').toLowerCase().includes(qq) || (p.soyad||'').toLowerCase().includes(qq) || (p.tc_no||'').includes(qq) || (p.telefon||'').includes(qq);
+  }).map((p,i)=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(p.ad)}</td><td>${escapeHtml(p.soyad)}</td><td>${escapeHtml(p.tc_no||'')}</td><td>${escapeHtml(p.telefon||'')}</td><td>${escapeHtml(p.eposta||'')}</td><td>
+      <button class="btn btn-sm btn-outline-primary me-1" data-action="edit-patient" data-id="${p.id}">Düzenle</button>
+      <button class="btn btn-sm btn-outline-danger" data-action="delete-patient" data-id="${p.id}">Sil</button>
+    </td>`;
+    return tr;
+  });
+  patientsTableBody.innerHTML=''; rows.forEach(r=>patientsTableBody.appendChild(r));
+  patientCountEl.textContent = patients.length;
+}
+
+function renderAppointmentsTable(q=''){
+  const rows = appointments.filter(a=>{
+    if(!q) return true; const qq=q.toLowerCase();
+    const p = patients.find(x=>x.id===a.hasta_id); const pname = p? fullName(p):'';
+    return pname.toLowerCase().includes(qq) || (a.doktor||'').toLowerCase().includes(qq) || (a.islem||'').toLowerCase().includes(qq) || (a.tarih||'').includes(qq);
+  }).map((a,i)=>{
+    const p = patients.find(x=>x.id===a.hasta_id);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${i+1}</td><td>${escapeHtml(p?fullName(p):'—')}</td><td>${escapeHtml(a.doktor||'')}</td><td>${escapeHtml(a.islem||'')}</td><td>${escapeHtml(a.tarih||'')}</td><td>${escapeHtml(a.saat||'')}</td><td>${escapeHtml(a.notlar||'')}</td><td>
+      <button class="btn btn-sm btn-outline-primary me-1" data-action="edit-appointment" data-id="${a.id}">Düzenle</button>
+      <button class="btn btn-sm btn-outline-danger" data-action="delete-appointment" data-id="${a.id}">Sil</button>
+    </td>`;
+    return tr;
+  });
+  appointmentsTableBody.innerHTML=''; rows.forEach(r=>appointmentsTableBody.appendChild(r));
+  appointmentCountEl.textContent = appointments.length;
+}
+
+function renderHastaSelect(){
+  hastaSelect.innerHTML = '';
+  const empty = document.createElement('option'); empty.value=''; empty.textContent='— Hasta seç —'; hastaSelect.appendChild(empty);
+  patients.forEach(p=>{ const opt=document.createElement('option'); opt.value=p.id; opt.textContent = `${fullName(p)}${p.tc_no? ' — '+p.tc_no : ''}`; hastaSelect.appendChild(opt); });
+}
+
+// --- CRUD ---
+function addPatient(d){ const p = {...d, id: uid('p')}; patients.push(p); Storage.save(Keys.patients, patients); renderAll(); return p; }
+function updatePatient(id,d){ const i=patients.findIndex(x=>x.id===id); if(i===-1) return false; patients[i] = {...patients[i], ...d}; Storage.save(Keys.patients, patients); renderAll(); return true; }
+function deletePatient(id){ const has = appointments.some(a=>a.hasta_id===id); if(has && !confirm('Bu hastaya ait randevular da silinecek. Devam?')) return false; appointments = appointments.filter(a=>a.hasta_id!==id); patients = patients.filter(p=>p.id!==id); Storage.save(Keys.patients, patients); Storage.save(Keys.appts, appointments); renderAll(); return true; }
+
+function addAppointment(d){ const a = {...d, id: uid('a')}; appointments.push(a); Storage.save(Keys.appts, appointments); scheduleReminderFor(a); renderAll(); return a; }
+function updateAppointment(id,d){ const i=appointments.findIndex(x=>x.id===id); if(i===-1) return false; appointments[i] = {...appointments[i], ...d}; Storage.save(Keys.appts, appointments); renderAll(); return true; }
+function deleteAppointment(id){ appointments = appointments.filter(a=>a.id!==id); Storage.save(Keys.appts, appointments); renderAll(); return true; }
+
+// --- Form handlers ---
+const patientForm = document.getElementById('patientForm');
+patientForm.addEventListener('submit', e=>{ e.preventDefault(); const f=e.target; const id=f.patient_id.value||''; const data = { ad:f.ad.value.trim(), soyad:f.soyad.value.trim(), dogum:f.dogum.value||'', tc_no:f.tc_no.value.trim(), telefon:f.telefon.value.trim(), eposta:f.eposta.value.trim(), adres:f.adres.value.trim() };
+  if(!data.ad||!data.soyad){ alert('Ad ve Soyad gerekli'); return; }
+  if(!id){ addPatient(data); f.reset(); const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#hastalar"]')); tab.show(); } else { updatePatient(id,data); f.reset(); }
+});
+
+document.getElementById('resetPatientBtn').addEventListener('click', ()=>patientForm.reset());
+
+const appointmentForm = document.getElementById('appointmentForm');
+appointmentForm.addEventListener('submit', e=>{ e.preventDefault(); const f=e.target; const id=f.appointment_id.value||''; const data = { hasta_id:f.hasta_id.value, doktor:f.doktor.value.trim(), islem:f.islem.value.trim(), tarih:f.tarih.value, saat:f.saat.value, notlar:f.notlar.value.trim() };
+  if(!data.hasta_id){ alert('Hasta seçin'); return; } if(!data.doktor){ alert('Doktor gerekli'); return; } if(!data.tarih||!data.saat){ alert('Tarih ve saat gerekli'); return; }
+  // çakışma
+  const conflict = appointments.find(a=>a.id!==id && a.doktor===data.doktor && a.tarih===data.tarih && a.saat===data.saat);
+  if(conflict && !confirm('Aynı doktor aynı tarih-saatte kayıtlı. Yine de kaydet?')) return;
+  if(!id){ addAppointment(data); f.reset(); const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#randevular"]')); tab.show(); } else { updateAppointment(id,data); f.reset(); }
+});
+document.getElementById('resetAppointmentBtn').addEventListener('click', ()=>appointmentForm.reset());
+
+// --- Table delegation ---
+document.body.addEventListener('click', e=>{
+  const act = e.target.dataset.action; const id = e.target.dataset.id; if(!act) return;
+  if(act==='edit-patient'){ const p = patients.find(x=>x.id===id); if(!p) return; fillPatientForm(p); }
+  else if(act==='delete-patient'){ if(confirm('Hasta silinsin mi?')) deletePatient(id); }
+  else if(act==='edit-appointment'){ const a = appointments.find(x=>x.id===id); if(!a) return; fillAppointmentForm(a); }
+  else if(act==='delete-appointment'){ if(confirm('Randevu silinsin mi?')) deleteAppointment(id); }
+});
+
+function fillPatientForm(p){ patientForm.patient_id.value = p.id; patientForm.ad.value=p.ad||''; patientForm.soyad.value=p.soyad||''; patientForm.dogum.value=p.dogum||''; patientForm.tc_no.value=p.tc_no||''; patientForm.telefon.value=p.telefon||''; patientForm.eposta.value=p.eposta||''; patientForm.adres.value=p.adres||''; const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#hasta-ekle"]')); tab.show(); }
+
+function fillAppointmentForm(a){ appointmentForm.appointment_id.value=a.id; appointmentForm.hasta_id.value=a.hasta_id||''; appointmentForm.doktor.value=a.doktor||''; appointmentForm.islem.value=a.islem||''; appointmentForm.tarih.value=a.tarih||''; appointmentForm.saat.value=a.saat||''; appointmentForm.notlar.value=a.notlar||''; const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#randevu-ekle"]')); tab.show(); }
+
+// --- Search & Filters ---
+globalSearch.addEventListener('input', ()=>{ renderPatientsTable(globalSearch.value); renderAppointmentsTable(globalSearch.value); renderCalendarEvents(); });
+
+document.getElementById('applyFilters').addEventListener('click', ()=>{ applyFiltersAndRender(); });
+function applyFiltersAndRender(){ const doc = filterDoctor.value.trim().toLowerCase(); const from = filterFrom.value; const to = filterTo.value; let list = appointments.slice(); if(doc) list = list.filter(a=> (a.doktor||'').toLowerCase().includes(doc)); if(from) list = list.filter(a=> a.tarih >= from); if(to) list = list.filter(a=> a.tarih <= to); renderAppointmentsFiltered(list); }
+function renderAppointmentsFiltered(list){ appointmentsTableBody.innerHTML=''; list.forEach((a,i)=>{ const p=patients.find(x=>x.id===a.hasta_id); const tr=document.createElement('tr'); tr.innerHTML=`<td>${i+1}</td><td>${escapeHtml(p?fullName(p):'—')}</td><td>${escapeHtml(a.doktor||'')}</td><td>${escapeHtml(a.islem||'')}</td><td>${escapeHtml(a.tarih||'')}</td><td>${escapeHtml(a.saat||'')}</td><td>${escapeHtml(a.notlar||'')}</td><td><button class="btn btn-sm btn-outline-primary me-1" data-action="edit-appointment" data-id="${a.id}">Düzenle</button><button class="btn btn-sm btn-outline-danger" data-action="delete-appointment" data-id="${a.id}">Sil</button></td>`; appointmentsTableBody.appendChild(tr); }); }
+
+// --- Import / Export (CSV & Excel) ---
+// Export JSON/CSV/XLSX for patients and appointments
+function exportJSON(filename, data){ const blob=new Blob([JSON.stringify(data, null, 2)], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
+function exportCSV(filename, arr){ if(!arr.length) return exportJSON(filename.replace('.csv','.json'), arr); const keys = Object.keys(arr[0]); const lines = [keys.join(',')].concat(arr.map(o=> keys.map(k=> '"'+String(o[k]||'').replace(/"/g,'""')+'"').join(','))); const blob=new Blob([lines.join('\n')], {type:'text/csv'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
+
+// Export appointments CSV
+document.getElementById('exportAppointments').addEventListener('click', ()=>{ exportCSV('randevular.csv', appointments.map(a=> ({hasta: (patients.find(p=>p.id===a.hasta_id)? fullName(patients.find(p=>p.id===a.hasta_id)) : ''), doktor:a.doktor, islem:a.islem, tarih:a.tarih, saat:a.saat, notlar:a.notlar })) ); });
+
+// Export appointments as PDF via jsPDF
+document.getElementById('exportAppointmentsPDF').addEventListener('click', ()=>{
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(12);
+  doc.text('Randevu Listesi', 14, 20);
+  let y=30;
+  appointments.forEach((a,i)=>{
+    const p = patients.find(x=>x.id===a.hasta_id); const pname = p? fullName(p):'—';
+    const line = `${i+1}. ${pname} | ${a.doktor} | ${a.islem || ''} | ${a.tarih} ${a.saat}`;
+    doc.text(line, 14, y); y+=8; if(y>270){ doc.addPage(); y=20; }
+  });
+  doc.save('randevular.pdf');
+});
+
+// Import patients via file input (CSV or XLSX)
+const importPatientsFile = document.getElementById('importPatientsFile');
+importPatientsFile.addEventListener('change', async (e)=>{
+  const f = e.target.files[0]; if(!f) return; const name=f.name.toLowerCase();
+  const data = await f.arrayBuffer();
+  if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+    const wb = XLSX.read(data, {type:'array'}); const sheet = wb.Sheets[wb.SheetNames[0]]; const json = XLSX.utils.sheet_to_json(sheet);
+    // expect columns: ad, soyad, tc_no, telefon, eposta, adres
+    json.forEach(row=>{ addPatient({ ad: row.ad || row.Ad || row.name || '', soyad: row.soyad || row.Soyad || '', tc_no: row.tc_no || '', telefon: row.telefon || '', eposta: row.eposta || '', adres: row.adres || '' }); });
+    alert('Hasta verileri içe aktarıldı.');
+  } else {
+    // CSV
+    const txt = new TextDecoder().decode(data); const lines = txt.split(/\r?\n/).filter(Boolean); const headers = lines[0].split(',').map(h=>h.trim().replace(/^"|"$/g,'')); for(let i=1;i<lines.length;i++){ const vals = lines[i].split(',').map(v=>v.replace(/^"|"$/g,'')); const obj = {}; headers.forEach((h,idx)=>obj[h]=vals[idx]||''); addPatient({ ad: obj.ad || obj.Ad || '', soyad: obj.soyad || obj.Soyad || '', tc_no: obj.tc_no||'', telefon: obj.telefon||'', eposta: obj.eposta||'', adres: obj.adres||'' }); }
+    alert('CSV içe aktarıldı.');
+  }
+  importPatientsFile.value='';
+});
+
+// Export patients (JSON/CSV/XLSX chooser simplified)
+document.getElementById('exportPatients').addEventListener('click', ()=>{
+  // create XLSX via SheetJS
+  const ws = XLSX.utils.json_to_sheet(patients.map(p=>({ad:p.ad, soyad:p.soyad, tc_no:p.tc_no, telefon:p.telefon, eposta:p.eposta, adres:p.adres}))); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Hastalar'); const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'}); const blob = new Blob([wbout], {type:'application/octet-stream'}); const url = URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='hastalar.xlsx'; a.click(); URL.revokeObjectURL(url);
+});
+
+// --- Calendar (FullCalendar) ---
+let calendar;
+function initCalendar(){ const calendarEl = document.getElementById('calendar'); calendar = new FullCalendar.Calendar(calendarEl, {
+  initialView: 'dayGridMonth', height: 600, selectable: true, headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek' },
+  eventClick(info){ const id = info.event.extendedProps._id; const a = appointments.find(x=>x.id===id); if(a) fillAppointmentForm(a); },
+  dateClick(info){ // hızlı randevu oluştur
+    const dateStr = info.dateStr; const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#randevu-ekle"]')); tab.show(); setTimeout(()=>{ appointmentForm.tarih.value = dateStr; }, 100);
+  }
+}); calendar.render(); renderCalendarEvents(); }
+
+function renderCalendarEvents(){ if(!calendar) return; calendar.removeAllEvents(); const q = globalSearch.value.trim().toLowerCase(); appointments.forEach(a=>{
+  const p = patients.find(x=>x.id===a.hasta_id); const title = `${p? fullName(p) : '—'} — ${a.doktor} ${a.islem? ' / '+a.islem : ''}`;
+  if(q){ const match = title.toLowerCase().includes(q) || a.tarih.includes(q); if(!match) return; }
+  calendar.addEvent({ title, start: a.tarih + 'T' + (a.saat || '09:00'), allDay: false, extendedProps: {_id: a.id} });
+}); }
+
+// Show calendar tab when button clicked
+document.getElementById('showCalendarBtn').addEventListener('click', ()=>{ const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#calendarTab"]')); tab.show(); setTimeout(()=>{ calendar && calendar.updateSize(); }, 200); });
+
+// --- Reminders / Notifications ---
+// We'll schedule reminders for each appointment if user allows notifications. We'll store scheduled timeouts in memory and reconstruct on load.
+let reminderTimers = {};
+function askNotificationPermission(){ if(!('Notification' in window)) return; if(Notification.permission === 'default') Notification.requestPermission(); }
+
+function scheduleAllReminders(){ // clear existing
+  Object.values(reminderTimers).forEach(t=> clearTimeout(t)); reminderTimers = {};
+  appointments.forEach(a=> scheduleReminderFor(a));
+}
+
+function scheduleReminderFor(a){ // settings.reminderMinutes before appointment
+  if(!settings.reminderMinutes) return; const dt = new Date(a.tarih + 'T' + (a.saat || '09:00')); const remindAt = new Date(dt.getTime() - (settings.reminderMinutes * 60000)); const now = new Date(); const ms = remindAt - now; if(ms <= 0) return; const tid = setTimeout(()=>{ showNotificationFor(a); }, ms); reminderTimers[a.id] = tid; }
+
+function showNotificationFor(a){ if(Notification.permission === 'granted'){
+  const p=patients.find(x=>x.id===a.hasta_id); const title = `Randevu: ${p? fullName(p) : 'Hasta'}`; const body = `${a.doktor} — ${a.tarih} ${a.saat}`; new Notification(title, { body }); }
+}
+
+// --- Simple PIN auth (client-side only) ---
+const authModal = new bootstrap.Modal(document.getElementById('authModal'));
+document.getElementById('openAuthBtn').addEventListener('click', ()=> authModal.show());
+
+document.getElementById('authSaveBtn').addEventListener('click', ()=>{
+  const pin = document.getElementById('authPin').value.trim(); const newPin = document.getElementById('authNewPin').value.trim();
+  const stored = settings.pinHash || null;
+  if(newPin){ // set new PIN (hash simple: btoa)
+    if(newPin.length < 4 || newPin.length > 8){ alert('PIN 4-8 karakter arası olmalı'); return; }
+    settings.pinHash = btoa(newPin); localStorage.setItem(Keys.settings, JSON.stringify(settings)); alert('Yeni PIN kaydedildi'); authModal.hide(); document.getElementById('authPin').value=''; document.getElementById('authNewPin').value=''; updateAuthBanner(); return;
+  }
+  if(stored){ if(!pin){ alert('PIN girin'); return; } if(btoa(pin) === stored){ authModal.hide(); localStorage.setItem('dg_authenticated', '1'); updateAuthBanner(); } else alert('PIN yanlış'); } else { alert('Önce yeni PIN belirleyin (Yeni PIN alanını kullanın)'); }
+});
+
+function updateAuthBanner(){ const authBanner = document.getElementById('authBanner'); const authed = localStorage.getItem('dg_authenticated') === '1'; if(authed) { authBanner.classList.remove('alert-warning'); authBanner.classList.add('alert-success'); authBanner.innerHTML = 'Giriş yapılmış. <button id="logoutBtn" class="btn btn-sm btn-outline-light ms-2">Çıkış Yap</button>'; document.getElementById('logoutBtn').addEventListener('click', ()=>{ localStorage.removeItem('dg_authenticated'); updateAuthBanner(); }); } else { authBanner.innerHTML = 'Uygulama PIN ile korunuyor. İlk kullanımda PIN belirleyin veya giriş yapın.<div class="ms-auto"><button id="openAuthBtn2" class="btn btn-sm btn-outline-dark">Giriş / PIN Ayarla</button></div>'; document.getElementById('openAuthBtn2').addEventListener('click', ()=> authModal.show()); authBanner.classList.remove('alert-success'); authBanner.classList.add('alert-warning'); } }
+
+// --- Clear data ---
+document.getElementById('clearAllData').addEventListener('click', ()=>{ if(confirm('Tüm veriler kalıcı olarak silinecek. Emin misiniz?')){ localStorage.removeItem(Keys.patients); localStorage.removeItem(Keys.appts); localStorage.removeItem(Keys.settings); patients=[]; appointments=[]; settings={}; renderAll(); alert('Veriler silindi.'); } });
+
+// --- Export appointments JSON ---
+function downloadText(filename, text){ const blob = new Blob([text], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; a.click(); URL.revokeObjectURL(url); }
+
+// --- Calendar initialization deferred until DOM ready ---
+window.addEventListener('DOMContentLoaded', ()=>{
+  initCalendar(); renderAll(); askNotificationPermission(); scheduleAllReminders(); });
+
+function renderAll(){ renderPatientsTable(globalSearch.value); renderAppointmentsTable(globalSearch.value); renderHastaSelect(); renderCalendarEvents(); }
+
+// --- Seed data first run ---
+function seedIfEmpty(){ if((patients||[]).length===0 && (appointments||[]).length===0){ const p1={id:uid('p'), ad:'Ali', soyad:'Yılmaz', tc_no:'12345678901', telefon:'905555555555', eposta:'ali@example.com', adres:'İstanbul'}; const p2={id:uid('p'), ad:'Ayşe', soyad:'Kara', tc_no:'10987654321', telefon:'905444444444', eposta:'ayse@example.com', adres:'Ankara'}; patients=[p1,p2]; appointments=[{id:uid('a'), hasta_id:p1.id, doktor:'Dr. Mehmet', islem:'Diş Çekimi', tarih:'2025-08-12', saat:'14:00', notlar:''},{id:uid('a'), hasta_id:p2.id, doktor:'Dr. Ahmet', islem:'Diş Temizleme', tarih:'2025-08-13', saat:'10:00', notlar:''}]; Storage.save(Keys.patients, patients); Storage.save(Keys.appts, appointments); } }
+seedIfEmpty();
+
+// --- After changes: update calendar & reminders ---
+function afterDataChange(){ renderAll(); scheduleAllReminders(); }
+// Hook CRUD to afterDataChange
+const origAddAppointment = addAppointment; addAppointment = function(d){ const a = origAddAppointment(d); afterDataChange(); return a; };
+const origUpdateAppointment = updateAppointment; updateAppointment = function(id,d){ const res = origUpdateAppointment(id,d); afterDataChange(); return res; };
+const origDeleteAppointment = deleteAppointment; deleteAppointment = function(id){ const res = origDeleteAppointment(id); afterDataChange(); return res; };
+const origAddPatient = addPatient; addPatient = function(d){ const p = origAddPatient(d); afterDataChange(); return p; };
+const origUpdatePatient = updatePatient; updatePatient = function(id,d){ const res = origUpdatePatient(id,d); afterDataChange(); return res; };
+const origDeletePatient = deletePatient; deletePatient = function(id){ const res = origDeletePatient(id); afterDataChange(); return res; };
+
+// --- Ensure calendar re-render after data change ---
+function renderCalendarEventsWrapper(){ renderCalendarEvents(); }
+
+// --- small UI wiring: quick add buttons ---
+document.getElementById('quick-add-patient').addEventListener('click', ()=>{ patientForm.reset(); const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#hasta-ekle"]')); tab.show(); });
+document.getElementById('quick-add-appointment').addEventListener('click', ()=>{ appointmentForm.reset(); const tab = new bootstrap.Tab(document.querySelector('[data-bs-target="#randevu-ekle"]')); tab.show(); });
+
+// --- Notification settings UI (quick) ---
+// Add a simple settings control via prompt for reminder minutes
+function configureReminderMinutes(){ const m = prompt('Hatırlatma kaç dakika önce gelsin? (örnek: 60 = 1 saat önce). Bos bırak = kapat', settings.reminderMinutes||'60'); if(m===null) return; if(!m) { delete settings.reminderMinutes; } else { settings.reminderMinutes = Math.max(0, Number(m)); }
+  localStorage.setItem(Keys.settings, JSON.stringify(settings)); scheduleAllReminders(); alert('Hatırlatıcı ayarı güncellendi.'); }
+
+// Add keyboard shortcut: ctrl+shift+r to set reminder minutes
+window.addEventListener('keydown', e=>{ if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()==='r'){ configureReminderMinutes(); } });
+
+// --- Init render ---
+updateAuthBanner(); renderAll();
+
+</script>
+</body>
+</html>
